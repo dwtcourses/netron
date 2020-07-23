@@ -64,7 +64,7 @@ view.View = class {
             }
             this._host.start();
         }).catch((err) => {
-            this.error(err.message, err);
+            this.error(err, null, null);
         });
     }
 
@@ -153,7 +153,7 @@ view.View = class {
         if (this._model && this._activeGraph) {
             this._updateGraph(this._model, this._activeGraph).catch((error) => {
                 if (error) {
-                    this.error('Graph update failed.', error);
+                    this.error(error, 'Graph update failed.', 'welcome');
                 }
             });
         }
@@ -286,13 +286,25 @@ view.View = class {
         }
     }
 
-    error(message, err) {
+    error(err, name, screen) {
         if (this._sidebar) {
             this._sidebar.close();
         }
         this._host.exception(err, false);
-        this._host.error(message, err.toString());
-        this.show('welcome');
+
+        const knowns = [
+            { name: 'Error loading Darknet model.', message: /^Cannot read property/, url: 'https://github.com/lutzroeder/netron/issues/539' },
+            { name: 'Error loading Keras model.', message: /^Invalid argument identifier/, url: 'https://github.com/lutzroeder/netron/issues/540' },
+            { name: 'Error loading Darknet model.', message: /^Invalid tensor shape/, url: 'https://github.com/lutzroeder/netron/issues/541' }
+        ];
+        const known = knowns.find((known) => err.name == known.name && err.message.match(known.message));
+        const message = (name ? err.toString() : err.message) + (known ? '\n\nPlease provide information about this issue at ' + known.url + '.' : '');
+        name = name || err.name;
+        this._host.error(name, message);
+        this.show(screen !== undefined ? screen : 'welcome');
+        if (known) {
+            this._host.openURL(known.url);
+        }
     }
 
     accept(file) {
@@ -326,7 +338,7 @@ view.View = class {
                 this._timeout(200).then(() => {
                     return this._updateGraph(model, graph).catch((error) => {
                         if (error) {
-                            this.error('Graph update failed.', error);
+                            this.error(error, 'Graph update failed.', 'welcome');
                         }
                     });
                 });
@@ -947,7 +959,7 @@ view.View = class {
                             this._host.export(file, blob);
                         }
                         catch (error) {
-                            this.error('Error saving NumPy tensor.', error);
+                            this.error(error, 'Error saving NumPy tensor.', null);
                         }
                     });
                 }).catch(() => {
